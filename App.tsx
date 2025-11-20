@@ -1,7 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { narrators, hadiths } from './data';
-import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Github, Mail } from 'lucide-react';
+import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Github, Mail, RefreshCw } from 'lucide-react';
 import { Narrator, Hadith } from './types';
+
+// APP VERSION CONTROL
+// تم رفع رقم الإصدار لتفعيل التحديث عند المستخدمين
+const APP_VERSION = '1.0.3'; 
 
 const App: React.FC = () => {
   const [selectedNarratorId, setSelectedNarratorId] = useState<string | null>(null);
@@ -15,12 +19,28 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [bookmarks, setBookmarks] = useState<number[]>([]);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Dark Mode and Bookmarks
+  // Initialize System (Dark Mode, Bookmarks, Version Check)
   useEffect(() => {
-    // Dark Mode
+    // 1. Check Version for Auto-Update
+    const storedVersion = localStorage.getItem('app_version');
+    if (storedVersion !== APP_VERSION) {
+      // If versions don't match, it means we have a new deployment
+      console.log(`New version detected: ${APP_VERSION} (Old: ${storedVersion})`);
+      
+      // If it's the very first visit, just set the version
+      if (!storedVersion) {
+        localStorage.setItem('app_version', APP_VERSION);
+      } else {
+        // If it's an update, show the update notification or auto-reload
+        setUpdateAvailable(true);
+      }
+    }
+
+    // 2. Dark Mode
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
@@ -31,7 +51,7 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
 
-    // Bookmarks
+    // 3. Bookmarks
     const savedBookmarks = localStorage.getItem('bookmarkedHadiths');
     if (savedBookmarks) {
       try {
@@ -41,6 +61,23 @@ const App: React.FC = () => {
       }
     }
   }, []);
+
+  // Apply Update Function
+  const applyUpdate = () => {
+    localStorage.setItem('app_version', APP_VERSION);
+    
+    // Clear all caches to ensure fresh files are loaded
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          caches.delete(name);
+        });
+      });
+    }
+
+    // Force reload from server, ignoring cache
+    window.location.reload();
+  };
 
   // Handle Scroll Top Visibility
   useEffect(() => {
@@ -114,8 +151,32 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen font-sans flex flex-col bg-[#faf9f6] dark:bg-slate-950 transition-colors duration-300">
+      
+      {/* Update Notification Banner */}
+      {updateAvailable && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-white p-3 shadow-lg animate-in slide-in-from-top-full duration-500">
+          <div className="max-w-7xl mx-auto flex justify-between items-center px-4">
+            <div className="flex items-center gap-2">
+               <div className="bg-white/20 p-1 rounded-full">
+                 <Sparkles className="w-4 h-4" />
+               </div>
+               <span className="text-sm font-bold">
+                 إصدار جديد متاح ({APP_VERSION})
+               </span>
+            </div>
+            <button 
+              onClick={applyUpdate}
+              className="bg-white text-amber-600 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-amber-50 transition-all shadow-sm flex items-center gap-2 active:scale-95"
+            >
+              <RefreshCw className="w-3 h-3" />
+              تحديث الآن
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hero Header */}
-      <header className="relative bg-[#064e3b] dark:bg-emerald-950 text-white overflow-hidden transition-all duration-500 shadow-xl">
+      <header className={`relative bg-[#064e3b] dark:bg-emerald-950 text-white overflow-hidden transition-all duration-500 shadow-xl ${updateAvailable ? 'mt-12' : ''}`}>
         {/* Background Pattern Overlay */}
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]"></div>
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-emerald-900/50 to-emerald-950/90 z-0"></div>
@@ -403,7 +464,7 @@ const App: React.FC = () => {
              <Sparkles className="w-5 h-5" />
            </div>
            <p className="text-slate-500 dark:text-slate-400 text-sm">إعداد وتطوير / إيمان محمود</p>
-           <p className="text-slate-400 dark:text-slate-600 text-xs">جميع الحقوق محفوظة &copy; {new Date().getFullYear()}</p>
+           <p className="text-slate-400 dark:text-slate-600 text-xs">جميع الحقوق محفوظة &copy; {new Date().getFullYear()} | الإصدار {APP_VERSION}</p>
         </div>
       </footer>
 
@@ -495,7 +556,7 @@ const App: React.FC = () => {
                   <Sparkles className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
               </div>
               <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">عن موسوعة تاج السنة</h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-6">الإصدار 1.0</p>
+              <p className="text-slate-500 dark:text-slate-400 mb-6">الإصدار {APP_VERSION}</p>
               
               <div className="space-y-4 text-right bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-700">
                 <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
