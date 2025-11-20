@@ -2,8 +2,15 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>تطبيق الحديث النبوي</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#064e3b" />
+    <meta name="description" content="موسوعة الحديث النبوي - تاج السنة: حفظ وعرض الأحاديث النبوية الشريفة." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="تاج السنة" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3059/3059964.png" />
+    <title>تطبيق الحديث النبوي | تاج السنة</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -28,6 +35,7 @@
     <style>
       html {
         scroll-behavior: smooth;
+        -webkit-tap-highlight-color: transparent;
       }
       body {
         font-family: 'Cairo', sans-serif;
@@ -96,7 +104,7 @@
 }
 </script>
 </head>
-  <body class="custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+  <body class="custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overscroll-y-none">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

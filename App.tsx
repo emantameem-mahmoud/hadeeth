@@ -514,6 +514,7 @@ const App: React.FC = () => {
                     <li>نظام المفضلة وحفظ العلامات</li>
                     <li>مشاركة النصوص ونسخها بسهولة</li>
                     <li>دعم كامل للوضع الليلي</li>
+                    <li>يدعم التثبيت كتطبيق (PWA)</li>
                   </ul>
                 </div>
               </div>
@@ -588,13 +589,25 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
       try {
         const textArea = document.createElement("textarea");
         textArea.value = textToShare;
+        
+        // Ensure textarea is part of the DOM but not visible to the user
+        // Fixed position avoids scrolling issues on mobile
         textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
         textArea.style.top = "0";
-        textArea.setAttribute("readonly", "");
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.padding = "0";
+        textArea.style.border = "none";
+        textArea.style.outline = "none";
+        textArea.style.boxShadow = "none";
+        textArea.style.background = "transparent";
+        textArea.setAttribute("readonly", ""); // Prevent keyboard from showing on mobile
+        
         document.body.appendChild(textArea);
         textArea.select();
-        textArea.setSelectionRange(0, 99999);
+        textArea.setSelectionRange(0, 99999); // For mobile devices
+        
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
         return successful;
