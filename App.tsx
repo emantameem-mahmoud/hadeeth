@@ -4,8 +4,8 @@ import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, S
 import { Narrator, Hadith } from './types';
 
 // APP VERSION CONTROL
-// تم رفع رقم الإصدار لتفعيل التحديث عند المستخدمين
-const APP_VERSION = '1.0.3'; 
+// تم رفع رقم الإصدار لإجبار المتصفح على جلب النسخة الجديدة
+const APP_VERSION = '1.0.5'; 
 
 const App: React.FC = () => {
   const [selectedNarratorId, setSelectedNarratorId] = useState<string | null>(null);
@@ -73,6 +73,19 @@ const App: React.FC = () => {
           caches.delete(name);
         });
       });
+    }
+    
+    // Unregister service workers just in case (Safely)
+    if ('serviceWorker' in navigator) {
+      try {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().catch(() => {});
+          }
+        }).catch(() => {});
+      } catch (e) {
+        console.warn("SW unregister failed during update", e);
+      }
     }
 
     // Force reload from server, ignoring cache

@@ -7,9 +7,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    emptyOutDir: true, // Clear dist folder before build
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Explicitly configure chunk naming to ensure cache busting
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           vendor: ['react', 'react-dom', 'lucide-react'],
         },
