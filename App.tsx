@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { narrators, hadiths } from './data';
-import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Github, Mail, RefreshCw } from 'lucide-react';
+import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Mail, RefreshCw } from 'lucide-react';
 import { Narrator, Hadith } from './types';
 
 // APP VERSION CONTROL
 // تم رفع رقم الإصدار لإجبار المتصفح على جلب النسخة الجديدة
-const APP_VERSION = '1.0.5'; 
+const APP_VERSION = '1.0.9'; 
 
 const App: React.FC = () => {
   const [selectedNarratorId, setSelectedNarratorId] = useState<string | null>(null);
@@ -23,48 +23,79 @@ const App: React.FC = () => {
   
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Initialize System (Dark Mode, Bookmarks, Version Check)
+  // Initialize System (Dark Mode, Bookmarks, Version Check, Safe SW Cleanup)
   useEffect(() => {
-    // 1. Check Version for Auto-Update
-    const storedVersion = localStorage.getItem('app_version');
-    if (storedVersion !== APP_VERSION) {
-      // If versions don't match, it means we have a new deployment
-      console.log(`New version detected: ${APP_VERSION} (Old: ${storedVersion})`);
-      
-      // If it's the very first visit, just set the version
-      if (!storedVersion) {
-        localStorage.setItem('app_version', APP_VERSION);
-      } else {
-        // If it's an update, show the update notification or auto-reload
-        setUpdateAvailable(true);
+    // 0. Safe Service Worker Cleanup (Robust Implementation)
+    // Ensures we only touch SW when the document is fully loaded and ready
+    // Wrapped in try-catch to prevent "InvalidStateError" in restricted environments
+    const cleanupSW = async () => {
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister().catch(err => console.warn('SW Unreg fail:', err));
+          }
+          console.debug('SW Cleanup complete');
+        } catch (e) {
+          // Swallow "InvalidStateError" or other access errors silently
+          console.debug('SW Access Error (Safe to ignore):', e);
+        }
       }
-    }
+    };
 
-    // 2. Dark Mode
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
+    // Execute cleanup safely
+    if (document.readyState === 'complete') {
+      cleanupSW();
     } else {
-      setDarkMode(false);
-      document.documentElement.classList.remove('dark');
+      window.addEventListener('load', cleanupSW);
     }
 
-    // 3. Bookmarks
-    const savedBookmarks = localStorage.getItem('bookmarkedHadiths');
-    if (savedBookmarks) {
-      try {
-        setBookmarks(JSON.parse(savedBookmarks));
-      } catch (e) {
-        console.error('Failed to parse bookmarks', e);
-      }
+    // 1. Check Version for Auto-Update & Dark Mode & Bookmarks
+    // Wrapped in try-catch because localStorage access can be denied in some contexts
+    try {
+        // Version Check
+        const storedVersion = localStorage.getItem('app_version');
+        if (storedVersion !== APP_VERSION) {
+          console.log(`New version detected: ${APP_VERSION} (Old: ${storedVersion})`);
+          if (!storedVersion) {
+            localStorage.setItem('app_version', APP_VERSION);
+          } else {
+            setUpdateAvailable(true);
+          }
+        }
+
+        // Dark Mode
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          setDarkMode(true);
+          document.documentElement.classList.add('dark');
+        } else {
+          setDarkMode(false);
+          document.documentElement.classList.remove('dark');
+        }
+
+        // Bookmarks
+        const savedBookmarks = localStorage.getItem('bookmarkedHadiths');
+        if (savedBookmarks) {
+            setBookmarks(JSON.parse(savedBookmarks));
+        }
+    } catch (e) {
+        console.warn('Storage/Theme initialization failed:', e);
     }
+
+    return () => {
+      window.removeEventListener('load', cleanupSW);
+    };
   }, []);
 
   // Apply Update Function
   const applyUpdate = () => {
-    localStorage.setItem('app_version', APP_VERSION);
+    try {
+        localStorage.setItem('app_version', APP_VERSION);
+    } catch (e) {
+        console.warn('Failed to set version in storage');
+    }
     
     // Clear all caches to ensure fresh files are loaded
     if ('caches' in window) {
@@ -75,19 +106,6 @@ const App: React.FC = () => {
       });
     }
     
-    // Unregister service workers just in case (Safely)
-    if ('serviceWorker' in navigator) {
-      try {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister().catch(() => {});
-          }
-        }).catch(() => {});
-      } catch (e) {
-        console.warn("SW unregister failed during update", e);
-      }
-    }
-
     // Force reload from server, ignoring cache
     window.location.reload();
   };
@@ -111,13 +129,19 @@ const App: React.FC = () => {
   }, [selectedNarratorId]);
 
   const toggleTheme = () => {
-    setDarkMode(!darkMode);
-    if (!darkMode) {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    
+    if (newMode) {
       document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+    }
+    
+    try {
+        localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    } catch (e) {
+        // Ignore storage errors
     }
   };
 
@@ -127,7 +151,11 @@ const App: React.FC = () => {
       : [...bookmarks, id];
     
     setBookmarks(newBookmarks);
-    localStorage.setItem('bookmarkedHadiths', JSON.stringify(newBookmarks));
+    try {
+        localStorage.setItem('bookmarkedHadiths', JSON.stringify(newBookmarks));
+    } catch (e) {
+        console.warn('Failed to save bookmark');
+    }
   };
 
   const scrollToTop = () => {
@@ -174,7 +202,7 @@ const App: React.FC = () => {
                  <Sparkles className="w-4 h-4" />
                </div>
                <span className="text-sm font-bold">
-                 إصدار جديد متاح ({APP_VERSION})
+                 تحديث جديد متاح ({APP_VERSION})
                </span>
             </div>
             <button 
@@ -257,7 +285,7 @@ const App: React.FC = () => {
                   placeholder="ابحث في الأحاديث، الرواة، أو الأرقام..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full py-4 bg-transparent text-white placeholder-emerald-200/50 focus:outline-none text-lg font-medium"
+                  className="w-full py-4 bg-transparent text-white placeholder-emerald-100/70 focus:outline-none text-lg font-medium"
                 />
                 {searchQuery && (
                   <button 
