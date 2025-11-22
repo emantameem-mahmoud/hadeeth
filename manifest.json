@@ -1,8 +1,10 @@
 {
   "name": "موسوعة الحديث النبوي",
   "short_name": "تاج السنة",
+  "id": "/index.html",
   "description": "تطبيق تفاعلي لحفظ وعرض 250 حديثاً من أحاديث المصطفى ﷺ",
-  "start_url": "./index.html",
+  "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#064e3b",
@@ -17,6 +19,20 @@
       "src": "https://cdn-icons-png.flaticon.com/512/3059/3059964.png",
       "sizes": "512x512",
       "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+        "src": "https://cdn-icons-png.flaticon.com/512/3059/3059964.png",
+        "type": "image/png",
+        "sizes": "512x512",
+        "form_factor": "wide"
+    },
+    {
+        "src": "https://cdn-icons-png.flaticon.com/512/3059/3059964.png",
+        "type": "image/png",
+        "sizes": "512x512",
+        "form_factor": "narrow"
     }
   ]
 }

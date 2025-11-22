@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { narrators, hadiths } from './data';
-import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Mail, RefreshCw, Lightbulb, MessageCircle, Facebook, Twitter } from 'lucide-react';
+import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Mail, Lightbulb, MessageCircle, Facebook, Twitter, Download } from 'lucide-react';
 import { Narrator, Hadith } from './types';
 
 // APP VERSION CONTROL
-// تم رفع رقم الإصدار لإجبار المتصفح على جلب النسخة الجديدة
-const APP_VERSION = '1.1.0'; 
+const APP_VERSION = '1.1.1'; 
 
 const App: React.FC = () => {
   const [selectedNarratorId, setSelectedNarratorId] = useState<string | null>(null);
@@ -19,91 +18,86 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [bookmarks, setBookmarks] = useState<number[]>([]);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
+  
+  // PWA Install State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
   
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Initialize System (Dark Mode, Bookmarks, Version Check, Safe SW Cleanup)
+  // Initialize System (Auto-Update, Dark Mode, Bookmarks, PWA Install)
   useEffect(() => {
-    // 0. Safe Service Worker Cleanup (Robust Implementation)
-    const cleanupSW = async () => {
-      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-        try {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          for (const registration of registrations) {
-            await registration.unregister().catch(err => console.warn('SW Unreg fail:', err));
-          }
-          console.debug('SW Cleanup complete');
-        } catch (e) {
-          console.debug('SW Access Error (Safe to ignore):', e);
-        }
-      }
+    // 1. PWA Install Prompt Listener
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setIsInstallable(true);
     };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Execute cleanup safely
-    if (document.readyState === 'complete') {
-      cleanupSW();
-    } else {
-      window.addEventListener('load', cleanupSW);
-    }
-
-    // 1. Check Version for Auto-Update & Dark Mode & Bookmarks
-    try {
-        // Version Check
+    // 2. Auto Update Logic (Aggressive)
+    const checkVersion = async () => {
+      try {
         const storedVersion = localStorage.getItem('app_version');
         if (storedVersion !== APP_VERSION) {
-          console.log(`New version detected: ${APP_VERSION} (Old: ${storedVersion})`);
-          if (!storedVersion) {
-            localStorage.setItem('app_version', APP_VERSION);
-          } else {
-            setUpdateAvailable(true);
+          console.log(`Auto-updating from ${storedVersion} to ${APP_VERSION}`);
+          
+          // Update storage
+          localStorage.setItem('app_version', APP_VERSION);
+          
+          // Clear Service Worker Caches
+          if ('caches' in window) {
+            const cacheKeys = await caches.keys();
+            await Promise.all(cacheKeys.map(key => caches.delete(key)));
           }
-        }
+          
+          // Unregister Service Workers
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+              await registration.unregister();
+            }
+          }
 
-        // Dark Mode
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-          setDarkMode(true);
-          document.documentElement.classList.add('dark');
-        } else {
-          setDarkMode(false);
-          document.documentElement.classList.remove('dark');
+          // Force Reload
+          window.location.reload();
         }
+      } catch (e) {
+        console.warn('Update check failed:', e);
+      }
+    };
+    checkVersion();
 
-        // Bookmarks
-        const savedBookmarks = localStorage.getItem('bookmarkedHadiths');
-        if (savedBookmarks) {
-            setBookmarks(JSON.parse(savedBookmarks));
-        }
-    } catch (e) {
-        console.warn('Storage/Theme initialization failed:', e);
+    // 3. Dark Mode Init
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+
+    // 4. Bookmarks Init
+    const savedBookmarks = localStorage.getItem('bookmarkedHadiths');
+    if (savedBookmarks) {
+        setBookmarks(JSON.parse(savedBookmarks));
     }
 
     return () => {
-      window.removeEventListener('load', cleanupSW);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
 
-  // Apply Update Function
-  const applyUpdate = () => {
-    try {
-        localStorage.setItem('app_version', APP_VERSION);
-    } catch (e) {
-        console.warn('Failed to set version in storage');
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
     }
-    
-    // Clear all caches to ensure fresh files are loaded
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => {
-          caches.delete(name);
-        });
-      });
-    }
-    
-    // Force reload from server, ignoring cache
-    window.location.reload();
+    setInstallPrompt(null);
   };
 
   // Handle Scroll Top Visibility
@@ -189,31 +183,8 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen font-sans flex flex-col bg-[#faf9f6] dark:bg-slate-950 transition-colors duration-300">
       
-      {/* Update Notification Banner */}
-      {updateAvailable && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-white p-3 shadow-lg animate-in slide-in-from-top-full duration-500">
-          <div className="max-w-7xl mx-auto flex justify-between items-center px-4">
-            <div className="flex items-center gap-2">
-               <div className="bg-white/20 p-1 rounded-full">
-                 <Sparkles className="w-4 h-4" />
-               </div>
-               <span className="text-sm font-bold">
-                 تحديث جديد متاح ({APP_VERSION})
-               </span>
-            </div>
-            <button 
-              onClick={applyUpdate}
-              className="bg-white text-amber-600 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-amber-50 transition-all shadow-sm flex items-center gap-2 active:scale-95"
-            >
-              <RefreshCw className="w-3 h-3" />
-              تحديث الآن
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Hero Header */}
-      <header className={`relative bg-[#064e3b] dark:bg-emerald-950 text-white overflow-hidden transition-all duration-500 shadow-xl ${updateAvailable ? 'mt-12' : ''}`}>
+      <header className="relative bg-[#064e3b] dark:bg-emerald-950 text-white overflow-hidden transition-all duration-500 shadow-xl">
         {/* Background Pattern Overlay */}
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]"></div>
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-emerald-900/50 to-emerald-950/90 z-0"></div>
@@ -223,12 +194,23 @@ const App: React.FC = () => {
           {/* Top Bar Icons */}
           <div className="flex justify-between items-center mb-6">
              <div className="flex items-center gap-2">
+                {/* Install Button - Only visible if installable */}
+                {isInstallable && (
+                  <button 
+                    onClick={handleInstallClick}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-500/20 transition-all animate-pulse"
+                  >
+                    <Download className="w-5 h-5" />
+                    <span className="text-sm hidden md:block">تثبيت التطبيق</span>
+                  </button>
+                )}
+
                 <button 
                   onClick={() => setShowVerification(!showVerification)}
                   className={`group flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 border ${showVerification ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/30' : 'bg-white/10 border-white/10 text-emerald-50 hover:bg-white/20'}`}
                 >
                   <SearchCheck className={`w-5 h-5 ${showVerification ? 'animate-pulse' : ''}`} />
-                  <span className="text-sm font-bold hidden md:block">التحقق من الحديث</span>
+                  <span className="text-sm font-bold hidden md:block">التحقق</span>
                 </button>
 
                 <button 
@@ -248,9 +230,6 @@ const App: React.FC = () => {
                >
                  {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                </button>
-               <div className="text-emerald-200/50 hidden md:block">
-                  <Sparkles className="w-6 h-6" />
-               </div>
              </div>
           </div>
 
@@ -493,7 +472,7 @@ const App: React.FC = () => {
       </button>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-10 mt-auto transition-colors">
+      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-10 mt-auto transition-colors pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-6xl mx-auto text-center px-4 space-y-2">
            <div className="flex items-center justify-center gap-2 text-emerald-800/80 dark:text-emerald-400/80 mb-4">
              <Sparkles className="w-5 h-5" />
@@ -613,6 +592,7 @@ const App: React.FC = () => {
                     <li>مشاركة النصوص ونسخها بسهولة</li>
                     <li>دعم كامل للوضع الليلي</li>
                     <li>يدعم التثبيت كتطبيق (PWA)</li>
+                    <li>يعمل بدون اتصال بالإنترنت</li>
                   </ul>
                 </div>
               </div>
