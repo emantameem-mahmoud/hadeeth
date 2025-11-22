@@ -10,4 +10,5 @@ export interface Hadith {
   narratorId: string;
   text: string;
   source: string; // e.g., Bukhari, Muslim
+  words?: { word: string; meaning: string }[];
 }

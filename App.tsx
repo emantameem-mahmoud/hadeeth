@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { narrators, hadiths } from './data';
-import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Mail, RefreshCw } from 'lucide-react';
+import { BookOpen, User, Info, X, Search, Quote, Sparkles, Users, ChevronDown, Share2, Check, ArrowUp, BookMarked, Star, ExternalLink, SearchCheck, Copy, Moon, Sun, Heart, Mail, RefreshCw, Lightbulb, MessageCircle, Facebook, Twitter } from 'lucide-react';
 import { Narrator, Hadith } from './types';
 
 // APP VERSION CONTROL
 // تم رفع رقم الإصدار لإجبار المتصفح على جلب النسخة الجديدة
-const APP_VERSION = '1.0.9'; 
+const APP_VERSION = '1.1.0'; 
 
 const App: React.FC = () => {
   const [selectedNarratorId, setSelectedNarratorId] = useState<string | null>(null);
@@ -26,8 +26,6 @@ const App: React.FC = () => {
   // Initialize System (Dark Mode, Bookmarks, Version Check, Safe SW Cleanup)
   useEffect(() => {
     // 0. Safe Service Worker Cleanup (Robust Implementation)
-    // Ensures we only touch SW when the document is fully loaded and ready
-    // Wrapped in try-catch to prevent "InvalidStateError" in restricted environments
     const cleanupSW = async () => {
       if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
         try {
@@ -37,7 +35,6 @@ const App: React.FC = () => {
           }
           console.debug('SW Cleanup complete');
         } catch (e) {
-          // Swallow "InvalidStateError" or other access errors silently
           console.debug('SW Access Error (Safe to ignore):', e);
         }
       }
@@ -51,7 +48,6 @@ const App: React.FC = () => {
     }
 
     // 1. Check Version for Auto-Update & Dark Mode & Bookmarks
-    // Wrapped in try-catch because localStorage access can be denied in some contexts
     try {
         // Version Check
         const storedVersion = localStorage.getItem('app_version');
@@ -504,7 +500,7 @@ const App: React.FC = () => {
              <span className="font-cairo font-bold text-lg">تاج السنة</span>
              <Sparkles className="w-5 h-5" />
            </div>
-           <p className="text-slate-500 dark:text-slate-400 text-sm">إعداد وتطوير / إيمان محمود</p>
+           <p className="text-slate-500 dark:text-slate-400 text-sm">الإعداد والتطوير / إيمان محمود</p>
            <p className="text-slate-400 dark:text-slate-600 text-xs">جميع الحقوق محفوظة &copy; {new Date().getFullYear()} | الإصدار {APP_VERSION}</p>
         </div>
       </footer>
@@ -622,8 +618,8 @@ const App: React.FC = () => {
               </div>
 
               <div className="mt-8 border-t border-slate-100 dark:border-slate-800 pt-6">
-                 <p className="text-xs text-slate-400 mb-2">تم التطوير بواسطة</p>
-                 <div className="font-bold text-slate-700 dark:text-slate-300">إيمان محمود</div>
+                 <p className="text-xs text-slate-400 mb-2">الإعداد والتطوير</p>
+                 <div className="font-bold text-slate-700 dark:text-slate-300 text-lg">إيمان محمود</div>
                  <div className="flex justify-center gap-4 mt-4">
                     <a href="#" className="text-slate-400 hover:text-emerald-600 transition-colors"><Share2 className="w-5 h-5" /></a>
                     <a href="mailto:contact@example.com" className="text-slate-400 hover:text-emerald-600 transition-colors"><Mail className="w-5 h-5" /></a>
@@ -661,60 +657,79 @@ interface HadithCardProps {
 
 const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmark }) => {
   const [isCopied, setIsCopied] = useState(false);
+  const [showMeanings, setShowMeanings] = useState(false);
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
   
   const narrator = narrators.find(n => n.id === hadith.narratorId);
   const narratorName = narrator ? narrator.name : "راوي الحديث";
 
-  const handleShare = async () => {
-    const textToShare = `${hadith.text}\n\n${hadith.source}\nراوي الحديث: ${narratorName}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'حديث نبوي',
-          text: textToShare,
-        });
-      } catch (error) {
-        console.error('Error sharing:', error);
-        handleCopy();
+  // Close share menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
+        setShowShareOptions(false);
       }
-    } else {
-      handleCopy();
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getShareText = () => {
+    return `${hadith.text}\n\n${hadith.source}\nراوي الحديث: ${narratorName}\n\nتم المشاركة من تطبيق تاج السنة`;
+  };
+
+  const handleShare = async (platform: 'native' | 'whatsapp' | 'twitter' | 'facebook' | 'copy') => {
+    const text = getShareText();
+    const url = window.location.href;
+
+    switch (platform) {
+      case 'whatsapp':
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        break;
+      case 'twitter':
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+        break;
+      case 'facebook':
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`, '_blank');
+        break;
+      case 'copy':
+        handleCopy();
+        break;
+      case 'native':
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: 'حديث نبوي',
+              text: text,
+            });
+          } catch (error) {
+            console.log('Share failed', error);
+          }
+        } else {
+          setShowShareOptions(true); // Fallback
+        }
+        break;
     }
+    setShowShareOptions(false);
   };
 
   const handleCopy = async () => {
-    const textToShare = `${hadith.text}\n\n${hadith.source}\nراوي الحديث: ${narratorName}`;
+    const textToShare = getShareText();
     let success = false;
 
     const copyFallback = () => {
       try {
         const textArea = document.createElement("textarea");
         textArea.value = textToShare;
-        
-        // Ensure textarea is part of the DOM but not visible to the user
-        // Fixed position avoids scrolling issues on mobile
         textArea.style.position = "fixed";
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.width = "2em";
-        textArea.style.height = "2em";
-        textArea.style.padding = "0";
-        textArea.style.border = "none";
-        textArea.style.outline = "none";
-        textArea.style.boxShadow = "none";
-        textArea.style.background = "transparent";
-        textArea.setAttribute("readonly", ""); // Prevent keyboard from showing on mobile
-        
+        textArea.style.left = "-9999px";
         document.body.appendChild(textArea);
         textArea.select();
-        textArea.setSelectionRange(0, 99999); // For mobile devices
-        
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
         return successful;
       } catch (err) {
-        console.error("Fallback copy failed:", err);
         return false;
       }
     };
@@ -724,7 +739,6 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
         await navigator.clipboard.writeText(textToShare);
         success = true;
       } catch (err) {
-        console.warn("Clipboard API failed, trying fallback:", err);
         success = copyFallback();
       }
     } else {
@@ -738,14 +752,14 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
   };
 
   return (
-    <div className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-emerald-400 dark:hover:border-emerald-600/50 transition-all duration-500 relative overflow-hidden">
+    <div className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-emerald-400 dark:hover:border-emerald-600/50 transition-all duration-500 relative overflow-visible">
       {/* Decorative Elements */}
-      <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 via-emerald-600 to-emerald-800 opacity-80"></div>
-      <div className="absolute top-4 left-4 opacity-5 group-hover:opacity-10 transition-opacity">
+      <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 via-emerald-600 to-emerald-800 opacity-80 rounded-t-2xl"></div>
+      <div className="absolute top-4 left-4 opacity-5 group-hover:opacity-10 transition-opacity overflow-hidden pointer-events-none">
         <Quote className="w-24 h-24 text-emerald-800 dark:text-emerald-400 transform -scale-x-100" />
       </div>
 
-      <div className="p-6 md:p-8 card-pattern">
+      <div className="p-6 md:p-8 card-pattern rounded-b-2xl">
         {/* Card Header */}
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
@@ -758,7 +772,7 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
              </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
              {/* Bookmark Button */}
              <button
                 onClick={onBookmark}
@@ -772,18 +786,40 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
                 <Heart className={`w-5 h-5 ${isBookmarked ? 'fill-current' : ''}`} />
              </button>
 
-             {/* Share Button */}
-             <button 
-               onClick={handleShare}
-               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-700 transition-all duration-300"
-               title="مشاركة الحديث"
-             >
-               <Share2 className="w-4 h-4" />
-               <span className="text-xs font-bold hidden sm:inline">مشاركة</span>
-             </button>
+             {/* Share Button with Dropdown */}
+             <div ref={shareRef} className="relative">
+               <button 
+                 onClick={() => setShowShareOptions(!showShareOptions)}
+                 className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-700 transition-all duration-300 ${showShareOptions ? 'bg-blue-50 text-blue-600 border-blue-200' : ''}`}
+                 title="مشاركة الحديث"
+               >
+                 <Share2 className="w-4 h-4" />
+                 <span className="text-xs font-bold hidden sm:inline">مشاركة</span>
+               </button>
+
+               {/* Share Menu Dropdown */}
+               {showShareOptions && (
+                 <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-100 dark:border-slate-700 z-30 overflow-hidden animate-in zoom-in-95 duration-200 origin-top-left">
+                    <div className="p-1 space-y-1">
+                      <button onClick={() => handleShare('whatsapp')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 rounded-lg transition-colors">
+                         <MessageCircle className="w-4 h-4" /> WhatsApp
+                      </button>
+                      <button onClick={() => handleShare('facebook')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 rounded-lg transition-colors">
+                         <Facebook className="w-4 h-4" /> Facebook
+                      </button>
+                      <button onClick={() => handleShare('twitter')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-sky-50 dark:hover:bg-sky-900/20 hover:text-sky-500 rounded-lg transition-colors">
+                         <Twitter className="w-4 h-4" /> Twitter/X
+                      </button>
+                      <button onClick={() => handleShare('copy')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 rounded-lg transition-colors">
+                         <Copy className="w-4 h-4" /> نسخ الرابط
+                      </button>
+                    </div>
+                 </div>
+               )}
+             </div>
 
              {/* Copy Button */}
-             <div className="relative">
+             <div className="relative hidden sm:block">
                 <button 
                   onClick={handleCopy}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 border active:scale-95 ${
@@ -801,24 +837,16 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
                   ) : (
                       <>
                         <Copy className="w-4 h-4" />
-                        <span className="text-xs font-bold hidden sm:inline">نسخ</span>
+                        <span className="text-xs font-bold">نسخ</span>
                       </>
                   )}
                 </button>
-
-                {/* Floating Tooltip */}
-                <div className={`absolute top-full left-1/2 transform -translate-x-1/2 mt-3 transition-all duration-500 ease-out z-20 pointer-events-none ${isCopied ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
-                  <div className="bg-slate-800 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-1.5 relative after:content-[''] after:absolute after:bottom-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-b-slate-800">
-                      <span>تم النسخ بنجاح</span>
-                      <Check className="w-3 h-3 text-emerald-400" />
-                  </div>
-                </div>
              </div>
           </div>
         </div>
 
         {/* Hadith Text */}
-        <div className="relative mb-8 px-2">
+        <div className="relative mb-6 px-2">
            {/* Right decorative bar */}
            <div className="absolute right-0 top-2 bottom-2 w-1 bg-emerald-500/20 dark:bg-emerald-500/40 rounded-full"></div>
            
@@ -827,18 +855,50 @@ const HadithCard: React.FC<HadithCardProps> = ({ hadith, isBookmarked, onBookmar
           </p>
         </div>
 
-        {/* Card Footer */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2 mt-4">
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-lg border border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-sm font-semibold transition-colors">
-             <BookOpen className="w-4 h-4 text-amber-500" />
-             <span>{hadith.source}</span>
+        {/* Card Footer & Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800/50">
+          <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs font-semibold transition-colors">
+                <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                <span>{hadith.source}</span>
+             </div>
+             <div className="flex items-center gap-1 text-emerald-600/80 dark:text-emerald-400/80 text-xs font-bold">
+                <Star className="w-3 h-3 fill-current" />
+                <span>صحيح</span>
+             </div>
           </div>
-          
-          <div className="flex items-center gap-1 text-emerald-600/80 dark:text-emerald-400/80 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-             <Star className="w-3 h-3 fill-current" />
-             <span>صحيح</span>
-          </div>
+
+          {/* Word Meanings Toggle */}
+          {hadith.words && hadith.words.length > 0 && (
+            <button 
+              onClick={() => setShowMeanings(!showMeanings)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-300 ${showMeanings ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-200' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
+            >
+              <Lightbulb className={`w-4 h-4 ${showMeanings ? 'fill-current' : ''}`} />
+              <span>معاني الكلمات</span>
+              <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${showMeanings ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
+
+        {/* Meanings Section (Expandable) */}
+        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showMeanings ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0 mt-0'}`}>
+           <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-xl p-4 border border-amber-100 dark:border-amber-900/30 text-sm">
+              <h4 className="font-bold text-amber-800 dark:text-amber-400 mb-3 flex items-center gap-2">
+                <BookMarked className="w-4 h-4" />
+                شرح المفردات:
+              </h4>
+              <ul className="space-y-2">
+                {hadith.words?.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap min-w-[80px]">{item.word}:</span>
+                    <span className="text-slate-600 dark:text-slate-400 leading-relaxed">{item.meaning}</span>
+                  </li>
+                ))}
+              </ul>
+           </div>
+        </div>
+
       </div>
     </div>
   );
